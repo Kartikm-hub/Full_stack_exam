@@ -14,7 +14,7 @@ const WebSocket = require("ws");
 
 // ─── Inject stub BEFORE requiring any module that loads FocusController ───────
 const FocusController = require("./src/focus/FocusController");
-const stubImpl = require("./src/focus/stub");
+const stubImpl = require("./focus/stub");
 
 // Custom controllable stub that records calls and lets us simulate failures
 let stubHiddenAppsToReturn = ["TestApp1", "TestApp2"];
