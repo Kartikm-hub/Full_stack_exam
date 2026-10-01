@@ -5,9 +5,10 @@ deliberate, time-boxed workspace. You start a focus session from the browser;
 the agent running on your own machine — and only the agent — enforces it on the
 operating system, then restores everything cleanly when the session ends.
 
-> **Project status: foundation only.** The repository currently contains the
-> specification and an empty workspace per component. No application code and
-> no dependencies exist yet. See [SPEC.md](./SPEC.md) for the full design and
+> **Project status: foundations.** The shared wire contract
+> ([shared/protocol](./shared/protocol)) and the React dashboard
+> ([client](./client)) exist; the server and agent are still empty workspaces.
+> See [SPEC.md](./SPEC.md) for the full design and
 > [PROMPTS.md](./PROMPTS.md) for the ordered task list.
 
 ## Architecture overview
@@ -48,11 +49,14 @@ operating system, then restores everything cleanly when the session ends.
 | Agent | Electron + Node.js, TypeScript | main process only for OS work; tray presence required |
 | Agent platform layer | one OS adapter per OS (`win32` / `darwin` / `linux`) | the *only* module allowed to touch the system |
 | Transport | REST over HTTPS + WebSocket on `127.0.0.1` | loopback-only agent socket, origin-validated |
-| Contracts | one `shared/protocol` package (JSON-schema validated) | prevents client/server/agent drift |
-| Tooling | ESLint + Prettier, Vitest, GitHub Actions | configured in M1, nothing installed yet |
+| Contracts | `shared/protocol` (`@focus-mode/protocol`), zero dependencies | envelope, payloads, error codes, state vocabularies |
+| Tooling | oxlint (client), `node:test` (protocol), Vite 8 | GitHub Actions pending M1 |
 
-No dependency is installed at this stage — versions are pinned when each
-workspace is scaffolded.
+Protocol consumption differs per workspace by necessity: the browser cannot
+resolve a bare npm package name, so `client/` uses a Vite alias (`@protocol`)
+pointing at `shared/protocol/src`, with no build step and no duplicate copy.
+`server/` and `agent/` will import the package by name (`file:../shared/protocol`
+until npm workspaces land in M1).
 
 ## Planned folder structure
 
@@ -80,8 +84,10 @@ focus-mode/
 │       ├── allowlist/       # protected baseline merge
 │       ├── os/              # OS adapters (one per platform) + stub
 │       └── ws/              # loopback WebSocket server, envelope codec
-├── shared/                  # message contracts + schemas (planned, M1)
-│   └── protocol/
+├── shared/
+│   └── protocol/            # @focus-mode/protocol — the shared wire contract
+│       ├── src/             # envelope, messages, errors, state
+│       └── test/            # node:test contract tests
 ├── tests/                   # cross-component integration tests (planned)
 ├── SPEC.md                  # architecture, protocols, data models, safety rules
 ├── PROMPTS.md               # numbered task log
@@ -98,7 +104,7 @@ parallel without stepping on each other.
 | Phase | Contents | Done when |
 | ----- | -------- | --------- |
 | **M0 — Foundation** | docs, spec, prompts, gitignore, empty workspaces | this commit |
-| **M1 — Contracts & tooling** | `shared/protocol`, envelope + message schemas, lint/test/CI | all three workspaces import the same schemas |
+| **M1 — Contracts & tooling** | `shared/protocol` envelope, payloads, error codes, state vocabularies (**done** in Prompt 003) | all three workspaces import the same contracts |
 | **M2 — Server skeleton** | Express app, env validation, Mongo connection, health, error handling | `/health` responds, tests run |
 | **M3 — Client skeleton** | Vite app, routing, layout, agent connection manager against a mock | dashboard builds and shows connection state |
 | **M4 — Agent skeleton** | Electron main process, tray icon + menu, single instance, clean shutdown | tray is visible and the app never double-launches |

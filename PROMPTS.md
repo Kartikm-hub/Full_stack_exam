@@ -29,7 +29,7 @@ numbered prompt, together with its intent, constraints and completion status.
 | -- | ----- | --------- | ------ |
 | 001 | Project foundation & documentation | repo / all | done |
 | 002 | Client foundation: React + Vite + Tailwind + Router | client | done |
-| 003 | Shared message contracts & tooling | all | planned |
+| 003 | Shared message contracts & tooling | all | done |
 | 004 | Server: project scaffold, config & health | server | planned |
 | 005 | Server: User & auth data models | server | planned |
 | 006 | Server: Device pairing data models + API | server | planned |
@@ -147,6 +147,117 @@ numbered prompt, together with its intent, constraints and completion status.
 - No `package.json`, no dependencies installed, no build tooling configured.
 - No OS automation, no focus logic, no Electron main process code.
 - No fake screens, endpoints or UI — only the documented plan.
+
+---
+
+# Prompt 003 — Shared message contracts & tooling
+
+- **Component:** all (shared contract package)
+- **Status:** `done`
+- **Depends on:** Prompt 001
+- **Blocks:** Prompts 004, 006, 010, 016, 022
+- **Scope:** the wire contract only. No transport, no business logic.
+
+## Purpose
+
+Stop the client, the server and the agent from inventing three different
+message formats. The envelope, payload contracts, error codes and state
+vocabularies from SPEC.md §5, §6.4 and §7 are frozen here as executable,
+tested contracts, so a malformed message becomes a validation error instead of
+a partially enforced focus session.
+
+Core rule encoded throughout: **reject, never repair.** A message that is
+almost valid is invalid.
+
+## Files created
+
+```
+shared/protocol/
+├── package.json              @focus-mode/protocol, zero runtime dependencies
+├── README.md                 contract documentation
+├── src/
+│   ├── envelope.js           createEnvelope / createReply / createMessageId /
+│   │                         validateEnvelope / validateMessage, versioning
+│   ├── messages.js           17 message types, directions, payload contracts
+│   ├── errors.js             13 fixed error codes, ProtocolError, retryable table
+│   ├── state.js              agent states, focus-session states, exit reasons
+│   └── index.js              public entry point re-exporting all of the above
+└── test/
+    ├── envelope.test.js      creation, ids, timestamps, version/type/id rejection
+    ├── messages.test.js      every type's payload contract, unknown fields
+    └── constants.test.js     error-code table and both state vocabularies
+```
+
+## Files changed
+
+- `client/vite.config.js` — added the `@protocol` alias pointing at
+  `shared/protocol/src`, plus `server.fs.allow` so Vite may serve it. Aliasing
+  the source (rather than installing a copy) means the dashboard always
+  compiles against the contracts in this repository.
+- `client/src/features/agent/agentStatus.js` — now keys its display copy and
+  predicates on `AGENT_STATES` / `LINK_STATES` / `isEnforcing` from the shared
+  package instead of local string literals, and gained
+  `isFocusConfirmedActive()`. Purely a refactor of Prompt 002 code: the rendered
+  output is identical, verified by the route smoke test.
+- `PROMPTS.md` — this entry.
+
+`server/` and `agent/` were not touched. `SPEC.md` was not modified.
+
+## Contracts defined
+
+- **Envelope** — `{ version, type, id, replyTo, timestamp, payload }` with
+  `PROTOCOL_VERSION = 1` and `SUPPORTED_PROTOCOL_VERSIONS = [1]`. Validation
+  checks `version` first, so an unknown version is reported as
+  `UNSUPPORTED_VERSION` even when other fields are also wrong.
+- **Message types** — all 17 from SPEC.md §5.1: `pair.request`, `pair.result`,
+  `unpair.request`, `getState`, `state.result`, `state.push`, `session.state`,
+  `focus.enter`, `focus.enter.accepted`, `focus.entered`, `focus.exit`,
+  `focus.exit.accepted`, `focus.exited`, `focus.extend`, `ping`, `pong`,
+  `error`. Each with a direction and a payload contract.
+- **Payload contracts** — `focus.enter` carries `{ sessionId, commandToken }`
+  and deliberately has **no** `allowList`, so the browser cannot dictate policy
+  (SPEC.md §7.8–7.9). `focus.exit` takes only `sessionId`. `getState` and
+  `unpair.request` take no fields. `ping` requires `sentAt`. `error` requires
+  `{ code, message, retryable }`. Contracts reject unknown fields
+  (`additional: false`) so a typo like `allowedList` fails loudly.
+- **Error codes** — the 13 required, plus `retryable` defaults: credential
+  failures are never retryable, `RATE_LIMITED` and `INTERNAL_ERROR` are.
+- **State vocabularies** — `AGENT_STATES` (8, upper case, in-process),
+  `FOCUS_SESSION_STATES` (6, lower case, persisted record), `EXIT_REASONS` (6)
+  with `AUTO_EXIT_REASONS`, and `LINK_STATES.UNAVAILABLE` kept deliberately
+  separate from agent states so the UI cannot imply a healthy machine.
+
+## Verification performed
+
+| Check | Result |
+| ----- | ------ |
+| `shared/protocol`: `npm test` (node:test) | **69/69 pass** |
+| `client`: `npm run lint` | clean, zero warnings |
+| `client`: `npm run build` | succeeds, 1997 modules, no errors |
+| `client`: `npm run smoke` | **13/13 pass** — 12 routes render expected content with zero console errors, 6/6 design tokens present |
+| `client`: `npm run dev` | all 11 routes + 404 return 200; protocol module served over the alias with no transform errors |
+
+Protocol test coverage includes: valid envelopes pass; missing/unsupported
+version, unknown type, missing/empty/oversized id, invalid timestamp and
+malformed payload all fail; unknown message types fail with
+`UNSUPPORTED_MESSAGE_TYPE`; every defined constant and all 17 message types are
+importable and round-trip through `validateMessage`.
+
+Three bugs were found and fixed during verification: `ERROR_CODES` was imported
+from the wrong module, `validatePayload` silently coerced a `null` payload to
+`{}` (a direct violation of the reject-never-repair rule), and `sessionId`
+lacked a `minLength` so an empty string passed.
+
+## Intentionally NOT implemented
+
+No WebSocket server or client, no pairing logic, no session state machine, no
+timers or watchdog, no Electron, no OS control, no process blocking, no
+database, no Express routes, no authentication, no npm workspaces or root
+install. The package has **zero runtime dependencies** and the client gained
+**zero** new dependencies: `@protocol` is a Vite alias, not an install.
+
+Prompts 004–024 own all of that. This package only defines what a valid message
+looks like.
 
 ---
 

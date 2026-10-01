@@ -1,0 +1,26 @@
+{
+  "name": "@focus-mode/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared message contracts for the Focus Mode client, server and Electron agent. Contracts only — no business logic.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./envelope": "./src/envelope.js",
+    "./messages": "./src/messages.js",
+    "./errors": "./src/errors.js",
+    "./state": "./src/state.js"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "license": "UNLICENSED"
+}
