@@ -30,7 +30,7 @@ numbered prompt, together with its intent, constraints and completion status.
 | 001 | Project foundation & documentation | repo / all | done |
 | 002 | Client foundation: React + Vite + Tailwind + Router | client | done |
 | 003 | Shared message contracts & tooling | all | done |
-| 004 | Server: project scaffold, config & health | server | planned |
+| 004 | Server: project scaffold, config & health | server | done |
 | 005 | Server: User & auth data models | server | planned |
 | 006 | Server: Device pairing data models + API | server | planned |
 | 007 | Server: Focus session data models + API | server | planned |
@@ -258,6 +258,121 @@ install. The package has **zero runtime dependencies** and the client gained
 
 Prompts 004–024 own all of that. This package only defines what a valid message
 looks like.
+
+---
+
+# Prompt 004 — Server: project scaffold, config & health
+
+- **Component:** server
+- **Status:** `done`
+- **Depends on:** Prompt 001
+- **Blocks:** Prompts 005, 006, 007, 008
+- **Scope:** backend foundation only, inside `server/`
+
+## Purpose
+
+Establish the Express skeleton the server prompts build on: a validated
+configuration module, centralised error handling, consistent JSON errors,
+minimal logging, graceful shutdown, and one honest health endpoint. Nothing
+product-facing.
+
+## Files created
+
+```
+server/
+├── package.json              express (runtime) + oxlint (dev) only
+├── .env.example              committed; .env stays ignored
+├── .oxlintrc.json
+├── src/
+│   ├── app.js                Express factory — no side effects, binds no port
+│   ├── server.js             lifecycle: env, listen, SIGINT/SIGTERM, exit
+│   ├── config/index.js       loadConfig() validation, ConfigError, redactSecrets()
+│   ├── lib/
+│   │   ├── logger.js         one JSON line per event, no framework
+│   │   └── http-error.js     ApiError + the single error body shape
+│   ├── middleware/
+│   │   ├── request-logger.js
+│   │   ├── not-found.js
+│   │   └── error-handler.js  must be mounted last
+│   └── routes/
+│       ├── health.js         GET /health
+│       └── index.js          the /api namespace
+└── tests/
+    ├── helpers.js            binds the app to an ephemeral port
+    ├── config.test.js        14 tests
+    └── app.test.js           20 tests
+```
+
+## Dependencies added
+
+**express 5** (runtime) and **oxlint 1.81** (dev, matching the client). Nothing
+else: no mongoose, no jsonwebtoken, no WebSocket library, no auth library, no
+dotenv, no validation library, no test framework. Env loading uses Node's
+built-in `--env-file-if-exists`, and config validation is hand-written because
+the rules are few and explicit.
+
+## What was delivered
+
+- **`app.js` / `server.js` split** so tests import the app and drive it over
+  real HTTP without a background process, and never bind the configured port.
+- **Configuration** — `NODE_ENV` (`development`/`test`/`production`), `PORT`
+  (integer 1–65535), `MONGODB_URI` (optional, prefix-checked). Invalid values
+  fail loudly at startup with a `ConfigError` listing every problem at once.
+- **`GET /health`** — reports the real configured environment, never claims the
+  database is connected, and advertises `features.* = not_implemented` so no
+  caller can mistake this for a working API.
+- **Consistent errors** — `{ "error": { "code", "message" } }` for every
+  failure: `INVALID_JSON` (400), `ROUTE_NOT_FOUND` (404), `PAYLOAD_TOO_LARGE`
+  (413), `INTERNAL_ERROR` (500).
+- **Honest `/api` namespace** — a scaffold index reporting `routes: []`, and
+  404 for `/api/auth/*`, `/api/devices`, `/api/sessions`, `/api/pairing`,
+  `/api/allowlist`. No placeholder endpoint that answers 200.
+- **Logging** — one JSON object per line. Bodies, headers and cookies are never
+  logged. `MONGODB_URI` appears only as `mongodbUriConfigured: boolean`.
+- **Graceful shutdown** — SIGINT/SIGTERM drain in-flight requests for up to
+  10 s, force-close, exit 0.
+
+## Verification
+
+| Command | Result |
+| ------- | ------ |
+| `cd server && npm run lint` | clean, exit 0, no warnings |
+| `cd server && npm test` | **34/34 pass** (10 suites) |
+| `npm start` (dev) | listens on 4000, `environment: "development"` |
+| `GET /health` | `200` — status, service, environment, timestamp, version, uptimeSeconds, `database: "not_configured"` |
+| `GET /api/not-a-real-route` | `404` `{"error":{"code":"ROUTE_NOT_FOUND","message":"Cannot GET /api/not-a-real-route"}}` |
+| `POST /api` malformed JSON | `400` `{"error":{"code":"INVALID_JSON",...}}` |
+| `POST /api` oversized (200 kB) | `413` `PAYLOAD_TOO_LARGE` |
+| Production run (`NODE_ENV=production`) | `environment: "production"`, no `details` in error bodies, no URI leak |
+| Bad env (`PORT=not-a-port`, `MONGODB_URI=postgres://…`) | exits 1 listing both problems, values never echoed |
+| SIGINT | drains and exits cleanly, process gone |
+| `cd shared/protocol && npm test` | **69/69 pass** — no regression |
+| `cd client && npm run lint` | clean, exit 0 |
+| `cd client && npm run build` | succeeds |
+| `cd client && npm run smoke` | **13/13 pass** — no regression |
+| `git ls-files \| grep -E '\.env$'` | empty — no secrets committed |
+
+Three bugs were found and fixed during verification: the direct-execution guard
+used `` `file://${process.argv[1]}` ``, which never matches on Windows, so
+`npm start` silently exited; the 500-handling test asserted the secret was in the
+log's `message` when it is correctly carried in `stack`; and an unused
+`startedAt` variable in `server.js`.
+
+## Not implemented yet
+
+- **MongoDB connection** — `MONGODB_URI` is parsed and validated; nothing connects.
+- **Mongoose models** — no `users`, `devices`, `pairingRequests`, `focusSessions`, `allowListEntries`, `auditEvents`.
+- **Authentication** — no login, no JWT, no session cookies.
+- **Pairing** — no 6-digit code issue, consumption or storage.
+- **Devices** — no device registration, listing or revocation.
+- **Focus sessions** — no session lifecycle, history or scheduling.
+- **Allow-list enforcement** — no baseline merging or validation.
+- **WebSocket** — no local socket, no agent communication.
+- **Electron / OS control** — belongs to `agent/`, never here (SPEC.md §7).
+- **Real focus mode** — nothing is enforced anywhere yet.
+
+`shared/protocol/` and `client/` were not modified. Per SPEC.md §7, the server
+authorises and records; it never enforces.
 
 ---
 

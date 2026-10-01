@@ -6,8 +6,9 @@ the agent running on your own machine — and only the agent — enforces it on 
 operating system, then restores everything cleanly when the session ends.
 
 > **Project status: foundations.** The shared wire contract
-> ([shared/protocol](./shared/protocol)) and the React dashboard
-> ([client](./client)) exist; the server and agent are still empty workspaces.
+> ([shared/protocol](./shared/protocol)), the React dashboard
+> ([client](./client)) and the Express server scaffold
+> ([server](./server)) exist; the Electron agent is still an empty workspace.
 > See [SPEC.md](./SPEC.md) for the full design and
 > [PROMPTS.md](./PROMPTS.md) for the ordered task list.
 
@@ -43,9 +44,9 @@ operating system, then restores everything cleanly when the session ends.
 | Client | React + Vite, TypeScript | SPA dashboard; React Router for pages |
 | Client state | React Query (server data) + a small WebSocket store | agent state comes from the agent, not from optimistic UI |
 | Client styling | CSS Modules (or Tailwind, decided in M1) | no design decision is locked yet |
-| Server | Node.js, Express, TypeScript | REST API, MERN |
-| Server data | MongoDB + Mongoose | users, devices, pairing requests, sessions, allow-list, audit |
-| Server validation | Zod (proposed) | shared with the other workspaces through `shared/protocol` |
+| Server | Node.js, Express 5, JavaScript | REST API, MERN; scaffold in `server/` |
+| Server data | MongoDB + Mongoose (later) | users, devices, pairing requests, sessions, allow-list, audit |
+| Server validation | hand-written in `server/src/config` | no library needed for the current rules |
 | Agent | Electron + Node.js, TypeScript | main process only for OS work; tray presence required |
 | Agent platform layer | one OS adapter per OS (`win32` / `darwin` / `linux`) | the *only* module allowed to touch the system |
 | Transport | REST over HTTPS + WebSocket on `127.0.0.1` | loopback-only agent socket, origin-validated |

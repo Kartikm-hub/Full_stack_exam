@@ -1,0 +1,23 @@
+{
+  "name": "focus-mode-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Focus Mode cloud API. Express scaffold, configuration and health endpoint.",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/server.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "lint": "oxlint"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "oxlint": "^1.81.0"
+  },
+  "license": "UNLICENSED"
+}
