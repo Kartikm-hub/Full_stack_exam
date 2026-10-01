@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focus Mode Agent</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    .container { padding: 24px 22px 20px; }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header p { font-size: 12px; color: #64748b; margin-top: 3px; }
+
+    /* Pairing Code Card */
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .pairing-code {
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: 10px;
+      color: #818cf8;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      padding: 4px 0;
+    }
+    .pairing-hint { font-size: 11px; color: #64748b; text-align: center; margin-top: 6px; }
+
+    /* Status row */
+    .status-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    .status-badge.idle {
+      background: rgba(100,116,139,0.2);
+      color: #94a3b8;
+    }
+    .status-badge.focusing {
+      background: rgba(129,140,248,0.15);
+      color: #818cf8;
+      box-shadow: 0 0 12px rgba(129,140,248,0.2);
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor;
+    }
+    .status-badge.focusing .status-dot {
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    /* Countdown */
+    #countdownBlock { display: none; }
+    #countdownBlock.visible { display: block; }
+    .countdown {
+      font-size: 32px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #c084fc;
+      text-align: center;
+      letter-spacing: 2px;
+      margin-top: 6px;
+    }
+    .countdown-label { font-size: 10px; color: #64748b; text-align: center; letter-spacing: 0.8px; text-transform: uppercase; margin-top: 2px; }
+
+    /* App lists */
+    .app-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+    .app-list li {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: #cbd5e1;
+      padding: 4px 0;
+    }
+    .app-list li::before {
+      content: "";
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+      flex-shrink: 0;
+    }
+    #hiddenAppsCard { display: none; }
+    #hiddenAppsCard.visible { display: block; }
+    .app-list.hidden-apps li::before { background: #f87171; }
+
+    /* Buttons */
+    .btn {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-end {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+    }
+    .btn-end:disabled {
+      background: rgba(239,68,68,0.2);
+      color: rgba(239,68,68,0.5);
+      cursor: not-allowed;
+    }
+    .btn-end:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(239,68,68,0.35); }
+    .btn-quit { background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.08); }
+    .btn-quit:hover { background: rgba(255,255,255,0.1); }
+
+    .empty-list { font-size: 12px; color: #475569; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h1>Focus Mode</h1>
+      <p>Local Companion Agent</p>
+    </div>
+
+    <!-- Pairing Code -->
+    <div class="card">
+      <div class="card-label">Pairing Code</div>
+      <div id="pairingCode" class="pairing-code">------</div>
+      <div class="pairing-hint">Enter this code in your Focus Mode dashboard</div>
+    </div>
+
+    <!-- Status + Countdown -->
+    <div class="card">
+      <div class="card-label">Status</div>
+      <div class="status-row">
+        <span id="statusBadge" class="status-badge idle">
+          <span class="status-dot"></span>
+          <span id="statusText">IDLE</span>
+        </span>
+      </div>
+      <div id="countdownBlock">
+        <div id="countdown" class="countdown">--:--</div>
+        <div class="countdown-label">Time Remaining</div>
+      </div>
+    </div>
+
+    <!-- Allowed Apps -->
+    <div class="card">
+      <div class="card-label">Allowed Apps</div>
+      <ul id="allowList" class="app-list">
+        <li>Focus Mode Agent</li>
+      </ul>
+    </div>
+
+    <!-- Hidden Apps (only visible during focus) -->
+    <div id="hiddenAppsCard" class="card">
+      <div class="card-label">Hidden Apps</div>
+      <ul id="hiddenApps" class="app-list hidden-apps"></ul>
+    </div>
+
+    <button id="endFocus" class="btn btn-end" disabled>⏹ End Focus Mode</button>
+    <button id="quit" class="btn btn-quit">Quit Agent</button>
+
+  </div>
+  <script src="./renderer.js"></script>
+</body>
+</html>
