@@ -14,7 +14,18 @@
  * agent itself says so.
  */
 
-/** @typedef {'IDLE'|'PAIRING'|'READY'|'ENTERING'|'ACTIVE'|'EXITING'|'FAILED'|'UNAVAILABLE'} AgentConnectionStatus */
+import { AGENT_STATES, LINK_STATES, isEnforcing } from '@protocol/state'
+
+/**
+ * Connection status the dashboard can display.
+ *
+ * The agent half is owned by the shared protocol (`AGENT_STATES`); the extra
+ * `UNAVAILABLE` member is the client-only link state (`LINK_STATES`), meaning
+ * no agent has answered yet. Keeping them separate stops the UI from implying
+ * a healthy machine when nothing has been confirmed (SPEC.md §7 principle 22).
+ *
+ * @typedef {'IDLE'|'PAIRING'|'READY'|'ENTERING'|'ACTIVE'|'EXTENDING'|'EXITING'|'FAILED'|'UNAVAILABLE'} AgentConnectionStatus
+ */
 
 /**
  * @typedef {object} AgentStatus
@@ -28,29 +39,34 @@
  * @property {Date|null} lastSeenAt
  */
 
+/**
+ * Display copy keyed by the shared vocabulary. Keys are protocol constants, so
+ * a state added in `shared/protocol/src/state.js` fails loudly here rather than
+ * silently rendering "Agent not connected".
+ */
 const STATUS_TEXT = {
-  IDLE: 'Agent idle',
-  PAIRING: 'Pairing in progress',
-  READY: 'Agent ready',
-  ENTERING: 'Entering focus mode',
-  ACTIVE: 'Focus mode active',
-  EXITING: 'Restoring your system',
-  FAILED: 'Agent reported a problem',
-  UNAVAILABLE: 'Agent not connected',
+  [AGENT_STATES.IDLE]: 'Agent idle',
+  [AGENT_STATES.PAIRING]: 'Pairing in progress',
+  [AGENT_STATES.READY]: 'Agent ready',
+  [AGENT_STATES.ENTERING]: 'Entering focus mode',
+  [AGENT_STATES.ACTIVE]: 'Focus mode active',
+  [AGENT_STATES.EXTENDING]: 'Extending focus mode',
+  [AGENT_STATES.EXITING]: 'Restoring your system',
+  [AGENT_STATES.FAILED]: 'Agent reported a problem',
+  [LINK_STATES.UNAVAILABLE]: 'Agent not connected',
 }
 
 const STATUS_HINT = {
-  IDLE: 'The local agent is running and waiting for a command.',
-  PAIRING: 'Waiting for the agent to confirm the pairing code.',
-  READY: 'Paired and idle. Starting a focus session only takes effect locally.',
-  ENTERING: 'The agent is asking the operating system to apply the allow-list.',
-  ACTIVE: 'The agent is enforcing the allow-list on this machine.',
-  EXITING: 'Blocked applications are being restored. This always finishes.',
-  FAILED: 'The last command failed. Nothing was left half-applied.',
-  UNAVAILABLE: 'Start the Focus Mode agent to control your machine from here.',
+  [AGENT_STATES.IDLE]: 'The local agent is running and waiting for a command.',
+  [AGENT_STATES.PAIRING]: 'Waiting for the agent to confirm the pairing code.',
+  [AGENT_STATES.READY]: 'Paired and idle. Starting a focus session only takes effect locally.',
+  [AGENT_STATES.ENTERING]: 'The agent is asking the operating system to apply the allow-list.',
+  [AGENT_STATES.ACTIVE]: 'The agent is enforcing the allow-list on this machine.',
+  [AGENT_STATES.EXTENDING]: 'A longer session is being applied. The end time moves, it never disappears.',
+  [AGENT_STATES.EXITING]: 'Blocked applications are being restored. This always finishes.',
+  [AGENT_STATES.FAILED]: 'The last command failed. Nothing was left half-applied.',
+  [LINK_STATES.UNAVAILABLE]: 'Start the Focus Mode agent to control your machine from here.',
 }
-
-const ACTIVE_STATUSES = ['ENTERING', 'ACTIVE', 'EXITING']
 
 /**
  * Current status of the local agent. Placeholder implementation on purpose.
@@ -58,7 +74,7 @@ const ACTIVE_STATUSES = ['ENTERING', 'ACTIVE', 'EXITING']
  */
 export function readAgentStatus() {
   return {
-    status: 'UNAVAILABLE',
+    status: LINK_STATES.UNAVAILABLE,
     agentId: null,
     label: null,
     platform: null,
@@ -71,23 +87,42 @@ export function readAgentStatus() {
 
 /** @param {AgentConnectionStatus} status */
 export function describeAgentStatus(status) {
+  const known = STATUS_TEXT[status] !== undefined
+  const fallback = STATUS_TEXT[LINK_STATES.UNAVAILABLE]
+
+  if (!known) {
+    console.warn(`[agentStatus] unknown status "${String(status)}", treating as unavailable`)
+  }
+
   return {
-    text: STATUS_TEXT[status] ?? STATUS_TEXT.UNAVAILABLE,
-    hint: STATUS_HINT[status] ?? STATUS_HINT.UNAVAILABLE,
+    text: known ? STATUS_TEXT[status] : fallback,
+    hint: known ? STATUS_HINT[status] : STATUS_HINT[LINK_STATES.UNAVAILABLE],
   }
 }
 
-/** A focus session is running or being applied. Drives teal accents. */
+/**
+ * A focus session is running or being applied. Drives teal accents.
+ * Delegates to the shared `isEnforcing` so the client and the agent agree on
+ * which states count as "a session is open".
+ */
 export function isFocusActive(status) {
-  return ACTIVE_STATUSES.includes(status)
+  return isEnforcing(status)
 }
 
 /**
  * SPEC.md §7 principle 22: the dashboard may only claim focus mode is on when
- * the agent has confirmed it.
+ * the agent has confirmed it. Narrower than `isFocusActive` on purpose.
+ */
+export function isFocusConfirmedActive(status) {
+  return status === AGENT_STATES.ACTIVE
+}
+
+/**
+ * SPEC.md §7 principle 22: a session may be requested only from a settled,
+ * paired agent. Prompt 012 uses this to gate the Start Focus button.
  */
 export function canStartFocus(status) {
-  return status === 'READY' || status === 'IDLE'
+  return status === AGENT_STATES.READY || status === AGENT_STATES.IDLE
 }
 
 /** Exit must always be reachable (SPEC.md §7 principle 12). */
