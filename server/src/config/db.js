@@ -1,15 +1,17 @@
 import mongoose from "mongoose";
 
-const connectDB = async (mongodbUri) => {
+const connectDB = async (mongodbUri, logger) => {
   if (!mongodbUri) {
     throw new Error("MONGODB_URI is not configured");
   }
 
   try {
     await mongoose.connect(mongodbUri);
-    console.log("MongoDB connected");
+    logger?.info?.("MongoDB connected");
   } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
+    logger?.error?.("MongoDB connection failed", {
+      error: error.message,
+    });
     throw error;
   }
 };
