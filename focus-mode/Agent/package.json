@@ -1,0 +1,23 @@
+{
+  "name": "focus-mode-agent",
+  "version": "1.0.0",
+  "description": "Focus Mode local companion agent",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test-client.js && node test-stage2.3.js && node test-focus-integration.js",
+    "test:focus": "node test-focus-integration.js",
+    "test:windows": "node test-windows-controller.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ws": "^8.18.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "electron": "^38.2.0"
+  },
+  "allowScripts": {
+    "electron@38.8.6": true
+  }
+}
