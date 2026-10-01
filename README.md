@@ -1,134 +1,507 @@
 # Focus Mode — Distraction Lockdown Dashboard
 
-A MERN dashboard plus a local companion agent that turns a normal desktop into a
-deliberate, time-boxed workspace. You start a focus session from the browser;
-the agent running on your own machine — and only the agent — enforces it on the
-operating system, then restores everything cleanly when the session ends.
+> A MERN-based focus dashboard with a local Electron companion agent that turns a normal desktop into a deliberate, time-boxed workspace.
 
-> **Project status: foundations.** The shared wire contract
-> ([shared/protocol](./shared/protocol)), the React dashboard
-> ([client](./client)) and the Express server scaffold
-> ([server](./server)) exist; the Electron agent is still an empty workspace.
-> See [SPEC.md](./SPEC.md) for the full design and
-> [PROMPTS.md](./PROMPTS.md) for the ordered task list.
+Focus Mode is a full-stack productivity system designed to help users create distraction-free work sessions.
 
-## Architecture overview
+The system consists of a **React dashboard**, a **Node.js/Express backend**, a **MongoDB data layer**, and a **local Electron companion agent**. The dashboard manages the user's focus sessions, while the companion agent acts as the trusted local component responsible for enforcing focus mode on the user's machine.
 
+---
+
+## 📌 Project Status
+
+**Current stage: Active development**
+
+The project foundation, shared protocol, React dashboard, Express server scaffold, and companion-agent architecture are being developed incrementally.
+
+### Current progress
+
+* ✅ Project architecture defined
+* ✅ Shared communication protocol created
+* ✅ React/Vite client workspace created
+* ✅ Express server scaffold created
+* ✅ Companion-agent workspace and architecture planned
+* ✅ Safety and fail-safe rules defined
+* 🚧 MongoDB integration
+* 🚧 Authentication and device management
+* 🚧 Agent pairing
+* 🚧 Focus-session state machine
+* 🚧 OS-level enforcement
+* 🚧 Integration testing
+* 🚧 Application packaging
+
+For the complete technical specification, see [SPEC.md](./SPEC.md).
+
+For the ordered development tasks, see [PROMPTS.md](./PROMPTS.md).
+
+---
+
+# 🎯 What is Focus Mode?
+
+Focus Mode creates a controlled environment for focused work.
+
+Instead of relying only on a browser interface, the system uses a **local companion agent** running directly on the user's computer.
+
+The workflow is:
+
+```text
+User
+ │
+ ▼
+React Dashboard
+ │
+ │ REST / WebSocket
+ ▼
+Express Server ───────► MongoDB
+ │
+ │ Local WebSocket
+ ▼
+Electron Companion Agent
+ │
+ ▼
+Operating System
 ```
-  browser tab  ──HTTPS/REST──▶  server/   Node.js + Express API  ──▶  MongoDB
-  (client/)    ◀──────────────  cloud API            │
-        │                                                 │ authorisation + history
-        └──ws://127.0.0.1:<agentPort>──────────────────────┘
-                          localhost WebSocket, paired
-                                   │
-                                   ▼
-                            agent/  Electron + Node.js
-                            the ONLY component allowed to touch the OS
-                            tray icon, pairing, session state, fail-safe
+
+The important design principle is:
+
+> **The browser requests focus mode. The companion agent enforces it.**
+
+This separation prevents the web dashboard from directly controlling the operating system.
+
+---
+
+# 🧩 System Architecture
+
+```text
+                         ┌─────────────────────┐
+                         │    React Client     │
+                         │      client/        │
+                         └──────────┬──────────┘
+                                    │
+                              HTTPS / REST
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │   Express Server    │
+                         │       server/       │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                              ┌───────────┐
+                              │  MongoDB  │
+                              └───────────┘
+
+
+     Localhost WebSocket
+            │
+            ▼
+┌───────────────────────────┐
+│   Electron Companion      │
+│          Agent            │
+│          agent/           │
+│                           │
+│  • Tray / Menu Bar        │
+│  • Pairing                │
+│  • Session Management     │
+│  • Watchdog / Fail-safe   │
+│  • OS Adapter             │
+│  • WebSocket Server       │
+└─────────────┬─────────────┘
+              │
+              ▼
+       Operating System
 ```
 
-- The **browser never controls the operating system.** It can only ask the
-  agent, over a localhost WebSocket, to run `enterFocus(allowList)`,
-  `exitFocus()` or `getState()`.
-- The **agent is always visible** in the tray / menu bar and is the single
-  enforcement point, behind a swappable OS-adapter interface.
-- The **cloud API** owns accounts, devices, session history and the protected
-  allow-list rules; it never enforces anything locally.
-- Everything is **explicit, reversible and fail-safe**: if the link drops, the
-  session times out or the agent crashes, the machine is restored on its own.
+---
 
-## Planned tech stack
+# 🖥️ Companion Agent
 
-| Layer | Choice | Notes |
-| ----- | ------ | ----- |
-| Client | React + Vite, TypeScript | SPA dashboard; React Router for pages |
-| Client state | React Query (server data) + a small WebSocket store | agent state comes from the agent, not from optimistic UI |
-| Client styling | CSS Modules (or Tailwind, decided in M1) | no design decision is locked yet |
-| Server | Node.js, Express 5, JavaScript | REST API, MERN; scaffold in `server/` |
-| Server data | MongoDB + Mongoose (later) | users, devices, pairing requests, sessions, allow-list, audit |
-| Server validation | hand-written in `server/src/config` | no library needed for the current rules |
-| Agent | Electron + Node.js, TypeScript | main process only for OS work; tray presence required |
-| Agent platform layer | one OS adapter per OS (`win32` / `darwin` / `linux`) | the *only* module allowed to touch the system |
-| Transport | REST over HTTPS + WebSocket on `127.0.0.1` | loopback-only agent socket, origin-validated |
-| Contracts | `shared/protocol` (`@focus-mode/protocol`), zero dependencies | envelope, payloads, error codes, state vocabularies |
-| Tooling | oxlint (client), `node:test` (protocol), Vite 8 | GitHub Actions pending M1 |
+The **Companion Agent** is the most important local component of Focus Mode.
 
-Protocol consumption differs per workspace by necessity: the browser cannot
-resolve a bare npm package name, so `client/` uses a Vite alias (`@protocol`)
-pointing at `shared/protocol/src`, with no build step and no duplicate copy.
-`server/` and `agent/` will import the package by name (`file:../shared/protocol`
-until npm workspaces land in M1).
+It is a lightweight **Electron + Node.js application** that runs on the user's own computer.
 
-## Planned folder structure
+Unlike the React dashboard and cloud server, the companion agent is allowed to interact with the local operating system.
 
+### Why is the agent required?
+
+A normal web application should not have unrestricted access to the operating system.
+
+Therefore, Focus Mode separates responsibilities:
+
+| Component       | Responsibility                                |
+| --------------- | --------------------------------------------- |
+| React Client    | User interface and session controls           |
+| Express Server  | Accounts, devices, sessions and cloud data    |
+| MongoDB         | Persistent application data                   |
+| Companion Agent | Local focus-mode enforcement                  |
+| OS Adapter      | Platform-specific operating-system operations |
+| Shared Protocol | Communication contract between components     |
+
+The browser can request an action, but it cannot directly perform the operating-system operation.
+
+---
+
+## ⚙️ Companion Agent Responsibilities
+
+The agent is designed to handle the following responsibilities.
+
+### 1. Tray / Menu Bar Presence
+
+The companion agent runs as a desktop application and remains visible through the system tray or menu bar.
+
+This provides the user with a clear indication that Focus Mode is active.
+
+The agent can also provide local controls such as:
+
+* Current focus-session state
+* Session information
+* Exit Focus Mode
+* Pairing status
+* Application status
+
+---
+
+### 2. Local WebSocket Communication
+
+The dashboard communicates with the local agent through a WebSocket running on:
+
+```text
+127.0.0.1
 ```
+
+The agent exposes a controlled communication interface rather than allowing arbitrary operating-system commands.
+
+The primary operations are:
+
+```text
+enterFocus(allowList)
+exitFocus()
+getState()
+```
+
+All communication follows the shared protocol defined inside:
+
+```text
+shared/protocol/
+```
+
+---
+
+### 3. Device Pairing
+
+The dashboard and companion agent must establish a trusted relationship before focus sessions can be controlled.
+
+The planned pairing system uses:
+
+* Short-lived pairing codes
+* Single-use 6-digit codes
+* Hashed credentials
+* OS keychain storage
+* Explicit pairing and unpairing
+
+This prevents an unrelated local webpage or application from automatically controlling the agent.
+
+---
+
+### 4. Session Management
+
+The agent maintains the local state of a focus session.
+
+A session can move through controlled states such as:
+
+```text
+IDLE
+   ↓
+FOCUSING
+   ↓
+EXITING
+   ↓
+RESTORED
+```
+
+The agent, rather than the browser, is the source of truth for the local session state.
+
+This prevents the dashboard from displaying a focus session as active when the local agent is not actually enforcing it.
+
+---
+
+### 5. Fail-Safe Behaviour
+
+Focus Mode is designed around a **fail-safe principle**.
+
+If something goes wrong, the machine should be restored rather than left in a restricted state.
+
+The agent is therefore designed to handle situations such as:
+
+* WebSocket connection loss
+* Planned session expiration
+* Agent shutdown
+* Unexpected agent crash
+* Session timeout
+
+The intended behaviour is:
+
+```text
+Problem occurs
+      ↓
+Agent detects failure
+      ↓
+Session ends
+      ↓
+Operating-system state is restored
+```
+
+No focus session should be infinite or impossible to exit.
+
+---
+
+### 6. OS Adapter Architecture
+
+Operating-system-specific functionality is isolated behind an adapter interface.
+
+```text
+                 OS Adapter Interface
+                         │
+          ┌──────────────┼──────────────┐
+          ▼              ▼              ▼
+       Windows         macOS          Linux
+       win32           darwin         linux
+```
+
+This allows the core agent logic to remain platform-independent.
+
+The agent itself does not need to know the implementation details of every operating system.
+
+Instead:
+
+```text
+Agent
+  ↓
+OS Adapter Interface
+  ↓
+Platform-specific implementation
+  ↓
+Operating System
+```
+
+This architecture also makes testing safer because the application can initially use a **stub adapter** without making real operating-system changes.
+
+---
+
+# 🔐 Security & Safety Design
+
+Focus Mode follows several important security principles.
+
+### Browser isolation
+
+The browser never directly controls the operating system.
+
+### Localhost restriction
+
+The agent listens only on:
+
+```text
+127.0.0.1
+```
+
+### Origin validation
+
+WebSocket connections validate their origin before accepting requests.
+
+### Protected allow-list
+
+Critical applications such as the browser, companion agent and system-critical applications cannot be removed from the protected allow-list.
+
+The allow-list can only be expanded, never reduced by an untrusted input path.
+
+### Explicit exit
+
+Focus Mode always provides an exit mechanism.
+
+Possible exit paths include:
+
+* Dashboard
+* Agent tray/menu
+* Keyboard shortcut
+
+### Automatic restoration
+
+When a session ends, the agent restores the previous system state.
+
+---
+
+# 🛠️ Technology Stack
+
+| Layer           | Technology                      | Purpose                           |
+| --------------- | ------------------------------- | --------------------------------- |
+| Frontend        | React + Vite + TypeScript       | Dashboard UI                      |
+| Client State    | React Query + WebSocket store   | Server and agent state            |
+| Backend         | Node.js + Express 5             | REST API                          |
+| Database        | MongoDB + Mongoose              | Persistent data                   |
+| Companion Agent | Electron + Node.js + TypeScript | Desktop agent                     |
+| Communication   | REST + WebSocket                | Client/server/agent communication |
+| Protocol        | `@focus-mode/protocol`          | Shared communication contract     |
+| Testing         | `node:test` + workspace tests   | Automated testing                 |
+| Linting         | oxlint                          | Code quality                      |
+| Build Tool      | Vite 8                          | Frontend development/build        |
+
+---
+
+# 📁 Project Structure
+
+```text
 focus-mode/
-├── client/                  # React dashboard (Vite SPA)      — owner: frontend dev
+│
+├── client/                       # React dashboard
 │   └── src/
-│       ├── api/             # REST calls to the cloud API
-│       ├── agent/           # localhost WebSocket manager, pairing flow
-│       ├── components/      # reusable UI
-│       ├── pages/           # dashboard, sessions, devices, history
-│       └── state/           # agent/session state store
-├── server/                  # Node.js + Express API            — owner: backend dev
+│       ├── api/                  # REST API communication
+│       ├── agent/                # Agent WebSocket manager
+│       ├── components/           # Reusable UI components
+│       ├── pages/                # Dashboard pages
+│       └── state/                # Application state
+│
+├── server/                       # Express backend
 │   └── src/
-│       ├── config/          # env parsing + validation
-│       ├── models/          # Mongoose schemas
-│       ├── routes/          # REST endpoints
-│       ├── services/        # pairing, sessions, allow-list
-│       └── middleware/      # auth, error handling, validation
-├── agent/                   # Electron companion (the OS authority) — owner: agent dev
+│       ├── config/               # Configuration and validation
+│       ├── models/               # Database models
+│       ├── routes/               # REST endpoints
+│       ├── services/             # Business logic
+│       └── middleware/           # Middleware
+│
+├── agent/                        # Electron companion agent
 │   └── src/
-│       ├── main/            # Electron main process, tray, lifecycle
-│       ├── pairing/         # 6-digit code flow, keychain storage
-│       ├── session/         # state machine, watchdog, auto-exit
-│       ├── allowlist/       # protected baseline merge
-│       ├── os/              # OS adapters (one per platform) + stub
-│       └── ws/              # loopback WebSocket server, envelope codec
+│       ├── main/                 # Electron main process
+│       ├── pairing/              # Device pairing
+│       ├── session/              # Session state machine
+│       ├── allowlist/            # Protected allow-list
+│       ├── os/                   # Operating-system adapters
+│       └── ws/                   # Local WebSocket server
+│
 ├── shared/
-│   └── protocol/            # @focus-mode/protocol — the shared wire contract
-│       ├── src/             # envelope, messages, errors, state
-│       └── test/            # node:test contract tests
-├── tests/                   # cross-component integration tests (planned)
-├── SPEC.md                  # architecture, protocols, data models, safety rules
-├── PROMPTS.md               # numbered task log
-├── README.md
+│   └── protocol/                 # Shared communication contract
+│       ├── src/
+│       └── test/
+│
+├── tests/                        # Integration tests
+│
+├── SPEC.md                       # Detailed architecture specification
+├── PROMPTS.md                    # Development task history
+├── README.md                     # Project documentation
 └── .gitignore
 ```
 
-The three workspaces are independent: each gets its own `package.json`, lint
-config and tests, so client, server, agent, contracts and QA can work in
-parallel without stepping on each other.
+---
 
-## Development phases
+# 🔄 How a Focus Session Works
 
-| Phase | Contents | Done when |
-| ----- | -------- | --------- |
-| **M0 — Foundation** | docs, spec, prompts, gitignore, empty workspaces | this commit |
-| **M1 — Contracts & tooling** | `shared/protocol` envelope, payloads, error codes, state vocabularies (**done** in Prompt 003) | all three workspaces import the same contracts |
-| **M2 — Server skeleton** | Express app, env validation, Mongo connection, health, error handling | `/health` responds, tests run |
-| **M3 — Client skeleton** | Vite app, routing, layout, agent connection manager against a mock | dashboard builds and shows connection state |
-| **M4 — Agent skeleton** | Electron main process, tray icon + menu, single instance, clean shutdown | tray is visible and the app never double-launches |
-| **M5 — Pairing** | 6-digit code issue/consume, keychain credential, unpair | a real dashboard pairs with a real agent |
-| **M6 — Agent state machine** | `enterFocus` / `exitFocus` / `getState` over a **stub** OS adapter | transitions unit-tested, no OS effect yet |
-| **M7 — Protected allow-list** | one-directional baseline merge, server + agent | no input path can remove browser/agent/system apps |
-| **M8 — Session UX** | start / extend / exit / history, driven by real agent state | UI never claims focus mode without agent confirmation |
-| **M9 — Fail-safe** | disconnect grace timer, planned-end timeout, crash-recovery restore | killing the agent mid-session still restores the machine |
-| **M10 — Real OS adapters** | per-platform enforcement behind the adapter interface | each platform has a tested restore path |
-| **M11 — Hardening & packaging** | integration tests, threat-model review, installers, deployment | release candidate |
+A typical session follows this flow:
 
-Real OS automation is deliberately last: nothing touches the OS until pairing,
-the protected allow-list and the fail-safe paths are proven.
+```text
+1. User opens the Focus Mode dashboard
+                ↓
+2. Dashboard connects to the companion agent
+                ↓
+3. User selects a focus duration
+                ↓
+4. Dashboard sends a request to the agent
+                ↓
+5. Agent validates the request
+                ↓
+6. Agent enters focus mode
+                ↓
+7. OS adapter applies the required restrictions
+                ↓
+8. Agent reports the actual state
+                ↓
+9. Dashboard displays the confirmed state
+                ↓
+10. Session reaches its planned end
+                ↓
+11. Agent exits focus mode
+                ↓
+12. OS state is restored
+```
 
-## Core safety rules (short version)
+The dashboard never assumes that an operation succeeded. The agent must confirm the resulting state.
 
-1. The agent is the only component that may interact with the OS.
-2. The agent listens on `127.0.0.1` only and validates the WebSocket `Origin`.
-3. Pairing needs a short-lived, single-use, hashed 6-digit code; the
-   credential lives in the OS keychain.
-4. The protected allow-list (browser, the agent itself, system-critical apps)
-   can only be added to, never subtracted.
-5. Exit is always available — dashboard, tray menu, hotkey — and no session is
-   ever infinite.
-6. Losing the link, reaching the planned end, or crashing the agent all end
-   the session with a full restore.
+---
+
+# 🚀 Development Roadmap
+
+| Phase | Description                                   | Status |
+| ----- | --------------------------------------------- | ------ |
+| M0    | Foundation, documentation and workspace setup | ✅      |
+| M1    | Shared protocol and tooling                   | ✅      |
+| M2    | Express server skeleton                       | 🚧     |
+| M3    | React client skeleton                         | 🚧     |
+| M4    | Electron companion agent                      | 🚧     |
+| M5    | Device pairing                                | 🚧     |
+| M6    | Agent state machine                           | 🚧     |
+| M7    | Protected allow-list                          | 🚧     |
+| M8    | Session UX                                    | 🚧     |
+| M9    | Fail-safe and crash recovery                  | 🚧     |
+| M10   | Real OS adapters                              | 🚧     |
+| M11   | Hardening, testing and packaging              | 🚧     |
+
+---
+
+# 🧪 Development Philosophy
+
+Focus Mode is being developed incrementally.
+
+Real operating-system automation is intentionally kept until the core architecture, communication protocol, pairing system, protected allow-list and fail-safe mechanisms have been tested.
+
+This gives the project a safer development progression:
+
+```text
+Architecture
+     ↓
+Shared Protocol
+     ↓
+Server + Client
+     ↓
+Agent
+     ↓
+Pairing
+     ↓
+State Machine
+     ↓
+Fail-Safe
+     ↓
+OS Adapter
+     ↓
+Real OS Enforcement
+```
+
+---
+
+# 📚 Documentation
+
+Additional project documentation:
+
+* [SPEC.md](./SPEC.md) — Complete architecture and technical specification
+* [PROMPTS.md](./PROMPTS.md) — Ordered development tasks and implementation prompts
+* [shared/protocol](./shared/protocol) — Shared communication contract
+
+---
+
+# 👨‍💻 Project
+
+**Focus Mode — Distraction Lockdown Dashboard**
+
+A full-stack productivity project combining:
+
+* Web development
+* Backend development
+* Desktop application development
+* WebSocket communication
+* OS-level integration
+* Security
+* Fail-safe system design
+* Cross-platform architecture
+
+---
+
+## 📌 Note
+
+The project is under active development. Features and architecture may evolve as implementation progresses.
