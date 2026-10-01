@@ -1,130 +1,175 @@
-/**
- * HTTP server bootstrap and process lifecycle.
- *
- * Owns everything `app.js` deliberately does not: reading the environment,
- * validating configuration, binding the port, and shutting down cleanly.
- *
- * Graceful shutdown (SIGINT / SIGTERM):
- *   1. stop accepting new connections
- *   2. let in-flight requests finish, up to a deadline
- *   3. force-close whatever is still open, so the process always exits
- *
- * No MongoDB teardown, because MongoDB is not connected yet (Prompt 004). The
- * comment marks where that hook belongs.
- */
+import connectDB from "./config/db.js";
+import { pathToFileURL } from "node:url";
+import { createApp, createDefaultLogger } from "./app.js";
+import { loadConfig } from "./config/index.js";
 
-import { pathToFileURL } from 'node:url'
-
-import { createApp, createDefaultLogger } from './app.js'
-import { loadConfig } from './config/index.js'
-
-/** How long in-flight requests may take to finish before we force close. */
-export const SHUTDOWN_TIMEOUT_MS = 10_000
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 /**
- * Start the server.
+ * Start the HTTP server.
  *
- * @param {object} [options]
- * @param {import('./config/index.js').ServerConfig} [options.config]
- * @returns {{ server: import('node:http').Server, config: object, close: () => Promise<void> }}
+ * MongoDB is connected in main() before this function is called.
+ * Keeping startServer synchronous makes it easier to test without
+ * requiring a live MongoDB connection.
  */
 export function startServer({ config = loadConfig() } = {}) {
-  const logger = createDefaultLogger(config)
-  const app = createApp({ config, logger })
+  const logger = createDefaultLogger(config);
+  const app = createApp({ config, logger });
 
   const server = app.listen(config.port, () => {
-    // Only safe facts are logged: never the Mongo URI, never env values.
-    logger.info('focus-mode server listening', {
-      environment: config.nodeEnv,
-      port: config.port,
-      // Presence only. The value can contain credentials.
-      mongodbUriConfigured: config.hasMongodbUri,
-      database: 'not_implemented',
-      pid: process.pid,
-    })
-  })
+    logger.info(
+      {
+        environment: config.nodeEnv,
+        port: config.port,
+        mongodb: config.hasMongodbUri
+          ? "configured"
+          : "not_configured",
+        database: "mongodb",
+      },
+      "Server started"
+    );
+  });
 
-  server.on('error', (error) => {
-    logger.error('http server error', { message: error.message, code: error.code })
-    process.exitCode = 1
-  })
+  server.on("error", (error) => {
+    logger.error(
+      {
+        error: error.message,
+      },
+      "HTTP server error"
+    );
+  });
 
-  const close = () =>
-    new Promise((resolve) => {
-      if (!server.listening) {
-        resolve()
-        return
-      }
+  let isClosing = false;
 
-      logger.info('shutdown requested, draining connections', {
-        graceMs: SHUTDOWN_TIMEOUT_MS,
-      })
+  const close = async () => {
+    if (isClosing) {
+      return;
+    }
 
-      const timer = setTimeout(() => {
-        logger.warn('shutdown deadline reached, forcing close', { graceMs: SHUTDOWN_TIMEOUT_MS })
-        // Prompt 007: close the MongoDB connection here too, before exit.
-        server.closeAllConnections?.()
-        resolve()
-      }, SHUTDOWN_TIMEOUT_MS)
+    isClosing = true;
 
-      // Do not let the deadline timer itself keep the event loop alive.
-      timer.unref?.()
+    logger.info("Starting graceful shutdown");
 
-      server.close(() => {
-        clearTimeout(timer)
-        resolve()
-      })
-    })
+    const forceShutdownTimer = setTimeout(() => {
+      logger.error("Graceful shutdown timed out");
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
 
-  return { server, config, close }
+    forceShutdownTimer.unref();
+
+    await new Promise((resolve) => {
+      server.close((error) => {
+        if (error) {
+          logger.error(
+            {
+              error: error.message,
+            },
+            "Error while closing HTTP server"
+          );
+        }
+
+        resolve();
+      });
+
+      // Available in newer Node.js versions.
+      server.closeAllConnections?.();
+    });
+
+    clearTimeout(forceShutdownTimer);
+
+    logger.info("HTTP server closed");
+  };
+
+  return {
+    app,
+    server,
+    config,
+    close,
+  };
 }
 
-/** Entry point when run directly (`npm run dev` / `npm start`). */
-function main() {
-  let config
+async function main() {
+  let config;
+
+  // Load and validate environment configuration.
+  try {
+    config = loadConfig();
+  } catch (error) {
+    process.stderr.write(
+      `\nConfiguration error: ${error.message}\n\n`
+    );
+    process.exit(1);
+  }
+
+  // Connect to MongoDB using the validated configuration.
+  try {
+    await connectDB(config.mongodbUri);
+  } catch (error) {
+    process.stderr.write(
+      `\nMongoDB connection failed: ${error.message}\n\n`
+    );
+    process.exit(1);
+  }
+
+  // Start the HTTP server.
+  let close;
 
   try {
-    config = loadConfig()
+    ({ close } = startServer({ config }));
   } catch (error) {
-    // Startup misconfiguration is fatal and must be obvious. `ConfigError`
-    // messages name variables and rules, never values.
-    process.stderr.write(`\n${error.message}\n\n`)
-    process.exit(1)
+    process.stderr.write(
+      `\nServer startup failed: ${error.message}\n\n`
+    );
+    process.exit(1);
   }
 
-  const { close } = startServer({ config })
-  let shuttingDown = false
+  const shutdown = async (signal) => {
+    process.stdout.write(
+      `\nReceived ${signal}. Shutting down...\n`
+    );
 
-  const handleSignal = async (signal) => {
-    if (shuttingDown) return
-    shuttingDown = true
+    try {
+      await close();
+      process.exit(0);
+    } catch (error) {
+      process.stderr.write(
+        `Shutdown failed: ${error.message}\n`
+      );
+      process.exit(1);
+    }
+  };
 
-    const logger = createDefaultLogger(config)
-    logger.info('received signal, shutting down', { signal })
+  process.on("SIGINT", () => {
+    void shutdown("SIGINT");
+  });
 
-    await close()
-    logger.info('shutdown complete', { signal })
-    process.exit(0)
-  }
+  process.on("SIGTERM", () => {
+    void shutdown("SIGTERM");
+  });
 
-  process.on('SIGINT', () => void handleSignal('SIGINT'))
-  process.on('SIGTERM', () => void handleSignal('SIGTERM'))
+  process.on("unhandledRejection", (reason) => {
+    process.stderr.write(
+      `Unhandled promise rejection: ${
+        reason instanceof Error
+          ? reason.message
+          : String(reason)
+      }\n`
+    );
+  });
 
-  // An unhandled rejection is a bug; log it and let the platform decide rather
-  // than pretending the process is healthy.
-  process.on('unhandledRejection', (reason) => {
-    const logger = createDefaultLogger(config)
-    logger.error('unhandled promise rejection', {
-      reason: reason instanceof Error ? reason.message : String(reason),
-    })
-  })
+  process.on("uncaughtException", (error) => {
+    process.stderr.write(
+      `Uncaught exception: ${error.message}\n`
+    );
+
+    void shutdown("uncaughtException");
+  });
 }
 
-// Only run when executed directly, never when imported by a test.
-// `pathToFileURL` handles Windows drive letters and UNC paths, which a naive
-// `file://${process.argv[1]}` comparison does not.
-const entryPoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : null
+const isMainModule =
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
 
-if (entryPoint === import.meta.url) {
-  main()
+if (isMainModule) {
+  void main();
 }
