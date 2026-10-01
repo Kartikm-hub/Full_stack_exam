@@ -7,7 +7,7 @@ export default function LoginPage() {
       subtitle="Sign in to reach your focus sessions and paired devices."
       footer={{ pretext: 'No account yet?', to: '/signup', linkLabel: 'Create one' }}
     >
-      <AuthFields buttonLabel="Sign in" disabledHint="Sign-in is wired up in a later prompt." />
+      <AuthFields buttonLabel="Sign in" mode="login" />
     </AuthLayout>
   )
 }

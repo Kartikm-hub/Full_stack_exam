@@ -1,43 +1,7 @@
-import { CheckCircle2Icon } from 'lucide-react'
+import { ArrowRightIcon, LockKeyholeIcon, ShieldCheckIcon, TimerIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-
-const UPCOMING = [
-  {
-    to: '/schedules',
-    icon: CheckCircle2Icon,
-    title: 'Schedules',
-    description: 'Plan recurring focus blocks with bounded, always-reversible sessions.',
-  },
-  {
-    to: '/insights',
-    icon: CheckCircle2Icon,
-    title: 'Insights',
-    description: 'Review focus totals and how sessions ended. No browsing history.',
-  },
-  {
-    to: '/allowlist',
-    icon: CheckCircle2Icon,
-    title: 'Allow-list',
-    description: 'Add the apps you want to keep. Protected apps are added automatically.',
-  },
-  {
-    to: '/devices',
-    icon: CheckCircle2Icon,
-    title: 'Devices',
-    description: 'Pair an agent with a short-lived 6-digit code and revoke it any time.',
-  },
-  {
-    to: '/settings',
-    icon: CheckCircle2Icon,
-    title: 'Settings',
-    description: 'Default duration, fail-safe behaviour and accessibility preferences.',
-  },
-]
-
-/** Marketing / landing route at `/`. Placeholder only. */
+/** Public overview route. */
 export default function LandingPage() {
   return (
     <div className="min-h-full">
@@ -48,7 +12,7 @@ export default function LandingPage() {
               aria-hidden="true"
               className="grid size-9 place-items-center rounded-lg bg-brand-800 text-white"
             >
-              <CheckCircle2Icon className="size-5" />
+              <TimerIcon className="size-5" />
             </span>
             <span className="text-sm font-semibold tracking-tight text-brand-950">Focus Mode</span>
           </div>
@@ -69,66 +33,36 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
-        <section className="max-w-2xl">
-          <Badge tone="brand">Distraction lockdown, reversible by design</Badge>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-brand-950 sm:text-4xl">
-            Deep work on your own machine, with an escape hatch you can always reach.
-          </h1>
-          <p className="mt-4 text-base leading-relaxed text-ink-500">
-            Pick a duration, and the Focus Mode agent blocks distractions locally while keeping
-            your browser, the agent itself and system-critical apps untouched. End it whenever
-            you want. Nothing is left half-applied.
-          </p>
-          <div className="mt-7 flex flex-wrap gap-3">
+      <main className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+        <section className="overflow-hidden rounded-lg bg-brand-950 px-6 py-10 text-white sm:px-10 sm:py-14">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase text-focus-300">Focus Mode · Local by design</p>
+            <h1 className="mt-4 text-3xl font-semibold sm:text-5xl">Make room for the work that matters.</h1>
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-brand-100">Choose a bounded focus session and let a visible local agent apply it on your computer. Your browser and protected system apps stay available, and you can end focus whenever you need.</p>
+          </div>
+          <div className="mt-8 flex flex-wrap gap-3">
             <Link
               to="/signup"
-              className="inline-flex h-11 items-center rounded-xl bg-brand-700 px-6 text-base font-medium text-white transition-colors hover:bg-brand-800"
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-focus-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-focus-800"
             >
-              Get started
+              Create your account <ArrowRightIcon className="size-4" />
             </Link>
             <Link
-              to="/dashboard"
-              className="inline-flex h-11 items-center rounded-xl border border-ink-200 bg-white px-6 text-base font-medium text-ink-700 transition-colors hover:bg-ink-50"
+              to="/login"
+              className="inline-flex h-11 items-center rounded-lg border border-white/30 px-5 text-sm font-medium text-white transition-colors hover:bg-white/10"
             >
-              View dashboard placeholder
+              Sign in
             </Link>
           </div>
         </section>
 
-        <section className="mt-16">
-          <div className="mb-5 flex items-center gap-3">
-            <h2 className="text-sm font-semibold tracking-tight text-ink-800">Product areas</h2>
-            <Badge tone="neutral">Coming next</Badge>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {UPCOMING.map((item) => {
-              const Icon = item.icon
-
-              return (
-                <Link key={item.to} to={item.to} className="group">
-                  <Card className="h-full transition-colors group-hover:border-brand-300">
-                    <CardHeader className="border-b-0 pb-2">
-                      <span
-                        aria-hidden="true"
-                        className="grid size-9 place-items-center rounded-lg bg-brand-50 text-brand-700"
-                      >
-                        <Icon className="size-4" />
-                      </span>
-                      <CardTitle className="mt-2">{item.title}</CardTitle>
-                      <CardDescription>{item.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <span className="text-xs font-medium text-brand-700 group-hover:underline">
-                        Open placeholder →
-                      </span>
-                    </CardContent>
-                  </Card>
-                </Link>
-              )
-            })}
-          </div>
+        <section className="mt-12 grid gap-8 border-b border-ink-200 pb-12 sm:grid-cols-3" aria-label="How Focus Mode works">
+          <article className="space-y-3"><span className="grid size-9 place-items-center rounded-md bg-brand-100 text-brand-800"><LockKeyholeIcon className="size-4" /></span><p className="text-xs font-semibold uppercase text-ink-400">01 · Install</p><h2 className="text-lg font-semibold text-brand-950">Run the local agent</h2><p className="text-sm leading-relaxed text-ink-500">The companion runs on your computer and is the only part of Focus Mode that can apply system restrictions. The agent package must be installed separately.</p></article>
+          <article className="space-y-3"><span className="grid size-9 place-items-center rounded-md bg-calm-100 text-calm-800"><ShieldCheckIcon className="size-4" /></span><p className="text-xs font-semibold uppercase text-ink-400">02 · Pair</p><h2 className="text-lg font-semibold text-brand-950">Connect with a short code</h2><p className="text-sm leading-relaxed text-ink-500">Enter the agent’s temporary 6-digit code. Paired computers can be reviewed and unlinked from your account at any time.</p></article>
+          <article className="space-y-3"><span className="grid size-9 place-items-center rounded-md bg-focus-100 text-focus-800"><TimerIcon className="size-4" /></span><p className="text-xs font-semibold uppercase text-ink-400">03 · Focus</p><h2 className="text-lg font-semibold text-brand-950">Set a limit and begin</h2><p className="text-sm leading-relaxed text-ink-500">Choose a duration, review the consent prompt, and start. The agent keeps protected apps available and always provides an immediate exit.</p></article>
         </section>
+
+        <section className="grid gap-5 py-10 sm:grid-cols-[1fr_auto] sm:items-center"><div><h2 className="text-lg font-semibold text-brand-950">Your activity stays yours.</h2><p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-500">Focus Mode records session duration and outcomes, not browsing history, window titles, or keystrokes. System changes are performed locally by the agent, never by the browser.</p></div><div className="rounded-lg border border-ink-200 bg-white px-4 py-3 text-xs text-ink-600"><ShieldCheckIcon className="mr-2 inline size-4 text-focus-700" />Reversible at any time</div></section>
       </main>
 
       <footer className="border-t border-ink-200 bg-white/60">

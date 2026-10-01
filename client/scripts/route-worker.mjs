@@ -47,6 +47,28 @@ window.document.write(
   shell.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<link[^>]+rel=["']stylesheet["'][^>]*>/gi, ''),
 )
 
+const protectedRoutes = ['/dashboard', '/focus', '/devices', '/allowlist', '/schedules', '/insights', '/settings', '/admin']
+if (protectedRoutes.includes(route)) window.sessionStorage.setItem('focus-mode-token', 'smoke-token')
+
+window.fetch = async (input) => {
+  const pathname = new URL(input, window.location.origin).pathname.replace('/api/v1', '')
+  let data = {}
+  if (pathname === '/auth/me') data = { user: { id: 'smoke-user', name: 'Smoke User', email: 'smoke@example.test', role: 'ADMIN' } }
+  else if (pathname === '/devices') data = []
+  else if (pathname === '/sessions/active') data = { session: null }
+  else if (pathname === '/sessions') data = { items: [] }
+  else if (pathname === '/allowlist') data = { protectedApps: ['Browser', 'Focus Mode agent'], userApps: [] }
+  else if (pathname === '/schedules') data = []
+  else if (pathname === '/insights') data = { summary: { totalMinutes: 0, currentStreak: 0, completedSessions: 0 }, daily: [], bestHours: [] }
+  else if (pathname === '/admin/users') data = { items: [] }
+  else if (pathname === '/admin/stats') data = { totalUsers: 1, activeUsers: 1, pairedDevices: 0, activeSessions: 0 }
+  else if (pathname === '/admin/presets') data = { items: [] }
+  return { ok: true, status: 200, json: async () => ({ success: true, data }) }
+}
+window.WebSocket = class WebSocketUnavailable {
+  constructor() { throw new Error('WebSocket is not available in smoke test') }
+}
+
 const globals = [
   'window',
   'document',
@@ -71,6 +93,7 @@ const globals = [
   'CSS',
   'SVGSVGElement',
   'fetch',
+  'WebSocket',
 ]
 
 // Node defines some of these (e.g. `navigator`) as getter-only, so swap them
@@ -94,7 +117,8 @@ assign('self', window)
 assign('globalThis', window)
 
 const assets = await readdir(join(distDir, 'assets'))
-const entryName = assets.find((name) => name.endsWith('.js'))
+const entrySource = shell.match(/<script[^>]+src="([^"]+\.js)"/i)?.[1]
+const entryName = entrySource?.split('/').pop() || assets.find((name) => name.startsWith('index-') && name.endsWith('.js'))
 const entryPath = pathToFileURL(join(distDir, 'assets', entryName)).href
 
 try {

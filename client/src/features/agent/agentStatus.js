@@ -1,13 +1,7 @@
 /**
  * Agent connection status contract.
  *
- * Mirrors the agent state shape from SPEC.md §5.1 (`state.result` /
- * `state.push`) so the WebSocket layer can be dropped in later WITHOUT
- * rewriting any component that consumes this type.
- *
- * This module contains NO connection logic. Today `readAgentStatus()` returns
- * a fixed "unavailable" snapshot; Prompt 010 replaces the implementation with
- * the real `getState` subscription and keeps the same exported shape.
+ * Stable UI contract for state reported by the local agent connection.
  *
  * Note on honesty (SPEC.md §7 principle 22): `UNAVAILABLE` is a real,
  * first-class status. The UI must never imply the agent is connected until the
@@ -29,22 +23,22 @@
  */
 
 const STATUS_TEXT = {
-  IDLE: 'Agent idle',
+  IDLE: 'Connected, not paired',
   PAIRING: 'Pairing in progress',
-  READY: 'Agent ready',
-  ENTERING: 'Entering focus mode',
-  ACTIVE: 'Focus mode active',
-  EXITING: 'Restoring your system',
+  READY: 'Connected',
+  ENTERING: 'Starting focus',
+  ACTIVE: 'Focusing',
+  EXITING: 'Ending focus',
   FAILED: 'Agent reported a problem',
-  UNAVAILABLE: 'Agent not connected',
+  UNAVAILABLE: 'Disconnected',
 }
 
 const STATUS_HINT = {
-  IDLE: 'The local agent is running and waiting for a command.',
+  IDLE: 'The local agent is connected but has not paired with this account.',
   PAIRING: 'Waiting for the agent to confirm the pairing code.',
-  READY: 'Paired and idle. Starting a focus session only takes effect locally.',
+  READY: 'The local agent is paired and connected.',
   ENTERING: 'The agent is asking the operating system to apply the allow-list.',
-  ACTIVE: 'The agent is enforcing the allow-list on this machine.',
+  ACTIVE: 'The agent reports that focus is active on this machine.',
   EXITING: 'Blocked applications are being restored. This always finishes.',
   FAILED: 'The last command failed. Nothing was left half-applied.',
   UNAVAILABLE: 'Start the Focus Mode agent to control your machine from here.',
@@ -53,7 +47,7 @@ const STATUS_HINT = {
 const ACTIVE_STATUSES = ['ENTERING', 'ACTIVE', 'EXITING']
 
 /**
- * Current status of the local agent. Placeholder implementation on purpose.
+ * Default state before a live agent connection is established.
  * @returns {AgentStatus}
  */
 export function readAgentStatus() {

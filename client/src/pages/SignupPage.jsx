@@ -10,7 +10,7 @@ export default function SignupPage() {
       <AuthFields
         confirm
         buttonLabel="Create account"
-        disabledHint="Registration is wired up in a later prompt."
+        mode="signup"
       />
     </AuthLayout>
   )

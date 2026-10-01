@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { AgentUnreachableNotice } from '@/components/agent/AgentStatusBadge'
 import { Header } from '@/components/layout/Header'
 import { Sidebar } from '@/components/layout/Sidebar'
-import { useAgentStatus } from '@/features/agent/AgentStatusProvider'
+import { useAgentStatus } from '@/features/agent/useAgentStatus'
 import { cn } from '@/lib/utils'
 
 /**

@@ -8,17 +8,16 @@ import { cn } from '@/lib/utils'
 const DOT_TONE = {
   IDLE: 'bg-ink-400',
   PAIRING: 'bg-calm-500 animate-pulse',
-  READY: 'bg-ink-400',
+  READY: 'bg-emerald-500',
   ENTERING: 'bg-focus-500 animate-pulse',
-  ACTIVE: 'bg-focus-500',
+  ACTIVE: 'bg-focus-600',
   EXITING: 'bg-warn-500 animate-pulse',
   FAILED: 'bg-danger-500',
   UNAVAILABLE: 'bg-ink-300',
 }
 
 /**
- * Human-readable date, or `null` while the placeholder has no data.
- * Kept here so future data layers format timestamps identically.
+ * Human-readable last-seen timestamp.
  */
 function formatLastSeen(lastSeenAt) {
   if (!lastSeenAt) return null
@@ -37,8 +36,7 @@ function formatLastSeen(lastSeenAt) {
  *        Defaults to `readAgentStatus()`. When the WebSocket layer lands this is
  *        the only prop that changes — pass live agent state.
  * @param {(status: import('@/features/agent/agentStatus').AgentConnectionStatus) => void} [props.onClick]
- *        Makes the badge a button. Used by the mobile layout to open the
- *        "Agent unavailable" banner, and later by the pairing flow (Prompt 011).
+ *        Makes the badge actionable for layouts that need status details.
  */
 export function AgentStatusBadge({ status = readAgentStatus(), onClick, className }) {
   const { text, hint } = describeAgentStatus(status.status)
@@ -65,7 +63,9 @@ export function AgentStatusBadge({ status = readAgentStatus(), onClick, classNam
     'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
     active
       ? 'border-focus-200 bg-focus-50 text-focus-800'
-      : unavailable
+      : status.status === 'READY'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        : unavailable
         ? 'border-ink-200 bg-white text-ink-500'
         : 'border-ink-200 bg-ink-50 text-ink-700',
     className,

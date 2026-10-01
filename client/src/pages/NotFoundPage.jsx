@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 
-import { PlaceholderNote } from '@/components/common/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
@@ -31,8 +30,6 @@ export default function NotFoundPage() {
           <Link to="/">Go to the start</Link>
         </Button>
       </div>
-
-      <PlaceholderNote />
     </div>
   )
 }

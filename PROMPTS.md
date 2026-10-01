@@ -35,11 +35,11 @@ numbered prompt, together with its intent, constraints and completion status.
 | 006 | Server: Device pairing data models + API | server | planned |
 | 007 | Server: Focus session data models + API | server | planned |
 | 008 | Server: audit log collection & write path | server | planned |
-| 009 | Client: auth pages wiring & route guards | client | planned |
-| 010 | Client: agent connection manager (WebSocket) | client | planned |
-| 011 | Client: pairing UI (6-digit code flow) | client | planned |
-| 012 | Client: session control UI (enter / extend / exit) | client | planned |
-| 013 | Client: agent state & system status views | client | planned |
+| 009 | Client: auth pages wiring & route guards | client | in review |
+| 010 | Client: agent connection manager (WebSocket) | client | in review |
+| 011 | Client: pairing UI (6-digit code flow) | client | in review |
+| 012 | Client: session control UI (enter / extend / exit) | client | in review |
+| 013 | Client: agent state & system status views | client | in review |
 | 014 | Agent: Electron scaffold + tray presence | agent | planned |
 | 015 | Agent: config, single-instance & logging | agent | planned |
 | 016 | Agent: loopback WebSocket server + envelope codec | agent | planned |
@@ -51,6 +51,21 @@ numbered prompt, together with its intent, constraints and completion status.
 | 022 | Integration: contract tests across all three | integration | planned |
 | 023 | OS adapter: real implementation (later milestone) | agent | planned |
 | 024 | Hardening, threat model review & packaging | all | planned |
+| 025 | Client: complete dashboard workflows | client | in review |
+
+---
+
+# Prompt 025 — Client: complete dashboard workflows
+
+- **Component:** client
+- **Status:** `in review`
+- **Depends on:** Prompts 009–013 and the documented server/agent contracts
+- **Scope:** client API/auth, connection handling, paired devices, focus sessions,
+  allow-list, schedules, insights, settings, admin views and landing page.
+- **Verification:** production build, Oxlint and the 13-route smoke suite pass.
+- **Integration caveat:** this workspace currently contains only `README.md` and
+  `.env` under `server/`, and only a scope note under `agent/`; live API/agent
+  integration remains unverified until those runtimes are present.
 
 ---
 

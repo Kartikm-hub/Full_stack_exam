@@ -1,15 +1,17 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import toast from 'react-hot-toast'
+import { z } from 'zod'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { useAuth } from '@/features/auth/useAuth'
 
 /**
  * Split-screen auth shell used by `/login` and `/signup`.
  *
- * Deliberately contains no auth logic: no submit handler, no validation, no
- * API call (Prompt 009 adds those). Inputs are disabled so the placeholder
- * cannot look like a working form.
+ * Shared public shell for validated login and registration forms.
  */
 export function AuthLayout({ title, subtitle, children, footer, aside }) {
   return (
@@ -78,15 +80,69 @@ export function AuthLayout({ title, subtitle, children, footer, aside }) {
   )
 }
 
-/** Static email/password fields for the auth placeholders. */
-export function AuthFields({ confirm = false, buttonLabel, disabledHint }) {
+/** Validated email/password fields shared by login and registration. */
+const loginSchema = z.object({
+  email: z.string().email('Enter a valid email address.'),
+  password: z.string().min(1, 'Enter your password.'),
+})
+
+const signupSchema = z.object({
+  name: z.string().trim().min(2, 'Use at least 2 characters for your name.'),
+  email: z.string().email('Enter a valid email address.'),
+  password: z.string().min(8, 'Use at least 8 characters.'),
+  confirmPassword: z.string(),
+}).refine((values) => values.password === values.confirmPassword, {
+  message: 'Passwords do not match.',
+  path: ['confirmPassword'],
+})
+
+export function AuthFields({ confirm = false, buttonLabel }) {
+  const { login, register } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState({})
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    const values = Object.fromEntries(new FormData(event.currentTarget))
+    const parsed = (confirm ? signupSchema : loginSchema).safeParse(values)
+    if (!parsed.success) {
+      setErrors(Object.fromEntries(parsed.error.issues.map((issue) => [issue.path[0], issue.message])))
+      return
+    }
+
+    setErrors({})
+    setLoading(true)
+    try {
+      const credentials = confirm
+        ? { name: parsed.data.name, email: parsed.data.email, password: parsed.data.password }
+        : parsed.data
+      await (confirm ? register(credentials) : login(credentials))
+      toast.success(confirm ? 'Account created.' : 'Welcome back.')
+      navigate(location.state?.from || '/dashboard', { replace: true })
+    } catch (error) {
+      toast.error(error.message || 'Authentication failed.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <Card className="mt-8">
+    <form className="mt-8" onSubmit={handleSubmit} noValidate>
+    <Card>
       <CardHeader className="border-b-0 pb-3">
         <CardTitle>Account details</CardTitle>
-        <CardDescription>{disabledHint}</CardDescription>
+        <CardDescription>Credentials are sent securely to your Focus Mode server.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {confirm ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="name">Name</Label>
+            <input id="name" name="name" autoComplete="name" required aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm" />
+            {errors.name ? <p id="name-error" className="text-xs text-danger-700">{errors.name}</p> : null}
+          </div>
+        ) : null}
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
           <input
@@ -95,9 +151,12 @@ export function AuthFields({ confirm = false, buttonLabel, disabledHint }) {
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
-            disabled
-            className="h-10 w-full rounded-lg border border-ink-200 bg-ink-50 px-3 text-sm text-ink-400 disabled:cursor-not-allowed"
+            required
+            aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? 'email-error' : undefined}
+            className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
           />
+          {errors.email ? <p id="email-error" className="text-xs text-danger-700">{errors.email}</p> : null}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="password">Password</Label>
@@ -105,11 +164,14 @@ export function AuthFields({ confirm = false, buttonLabel, disabledHint }) {
             id="password"
             name="password"
             type="password"
-            autoComplete="current-password"
+            autoComplete={confirm ? 'new-password' : 'current-password'}
             placeholder="••••••••"
-            disabled
-            className="h-10 w-full rounded-lg border border-ink-200 bg-ink-50 px-3 text-sm text-ink-400 disabled:cursor-not-allowed"
+            required
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby={errors.password ? 'password-error' : undefined}
+            className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
           />
+          {errors.password ? <p id="password-error" className="text-xs text-danger-700">{errors.password}</p> : null}
         </div>
         {confirm ? (
           <div className="space-y-1.5">
@@ -120,20 +182,21 @@ export function AuthFields({ confirm = false, buttonLabel, disabledHint }) {
               type="password"
               autoComplete="new-password"
               placeholder="••••••••"
-              disabled
-              className="h-10 w-full rounded-lg border border-ink-200 bg-ink-50 px-3 text-sm text-ink-400 disabled:cursor-not-allowed"
+              required
+              aria-invalid={Boolean(errors.confirmPassword)}
+              aria-describedby={errors.confirmPassword ? 'confirm-password-error' : undefined}
+              className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
             />
+            {errors.confirmPassword ? <p id="confirm-password-error" className="text-xs text-danger-700">{errors.confirmPassword}</p> : null}
           </div>
         ) : null}
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-2">
-        <Button type="button" size="lg" disabled>
-          {buttonLabel}
+        <Button type="submit" size="lg" disabled={loading}>
+          {loading ? 'Please wait…' : buttonLabel}
         </Button>
-        <p className="text-center text-xs text-ink-400">
-          Authentication is not implemented in this prompt.
-        </p>
       </CardFooter>
     </Card>
+    </form>
   )
 }

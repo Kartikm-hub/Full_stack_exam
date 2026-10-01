@@ -50,14 +50,4 @@ export function SectionHeading({ title, description, action }) {
   )
 }
 
-/** Marker for scaffolding-only sections that are not wired to data yet. */
-export function PlaceholderNote({ children = 'Placeholder — no data connected in this prompt.' }) {
-  return (
-    <p className="flex items-center gap-1.5 text-xs text-ink-400">
-      <span aria-hidden="true" className="size-1.5 rounded-full bg-ink-300" />
-      {children}
-    </p>
-  )
-}
-
 export default PageHeader

@@ -1,5 +1,6 @@
 import { MenuIcon, UserRoundIcon } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 
 import { AgentStatusBadge } from '@/components/agent/AgentStatusBadge'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -20,6 +21,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { NAV_ITEMS, PRODUCT } from '@/config/navigation'
+import { useAuth } from '@/features/auth/useAuth'
 
 /** Title of the current route, resolved from the navigation table. */
 function useRouteTitle() {
@@ -40,6 +42,18 @@ function useRouteTitle() {
  */
 export function Header({ agentStatus, showAgentStatus = true, children }) {
   const title = useRouteTitle()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    try {
+      await logout()
+      toast.success('Signed out.')
+      navigate('/login', { replace: true })
+    } catch (error) {
+      toast.error(error.message || 'Could not sign out.')
+    }
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-ink-200 bg-white/85 backdrop-blur-sm">
@@ -91,7 +105,7 @@ export function Header({ agentStatus, showAgentStatus = true, children }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Account</DropdownMenuLabel>
+            <DropdownMenuLabel>{user?.name || user?.email || 'Account'}</DropdownMenuLabel>
             <DropdownMenuItem asChild>
               <Link to="/settings">Account settings</Link>
             </DropdownMenuItem>
@@ -99,7 +113,7 @@ export function Header({ agentStatus, showAgentStatus = true, children }) {
               <Link to="/devices">Paired devices</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="danger">Sign out</DropdownMenuItem>
+            <DropdownMenuItem variant="danger" onSelect={handleLogout}>Sign out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

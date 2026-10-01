@@ -38,8 +38,8 @@ const ROUTES = [
 
 /** Substrings that must appear in the rendered output for each route. */
 const EXPECTED = {
-  '/': ['Focus Mode', 'Create account'],
-  '/login': ['Welcome back', 'Sign in', 'not implemented'],
+  '/': ['Focus Mode', 'Create account', 'Install', 'Pair', 'Focus'],
+  '/login': ['Welcome back', 'Sign in', 'Email', 'Password'],
   '/signup': ['Create your account', 'Confirm password'],
   '/dashboard': [
     'Start Focus',
@@ -48,15 +48,15 @@ const EXPECTED = {
     '60',
     "Today's focus time",
     'Recent sessions',
-    'Agent not connected',
+    'Disconnected',
   ],
-  '/focus': ['Focus mode is on', '00:00', 'End Focus', 'agent tray icon'],
-  '/devices': ['Devices', 'Placeholder', '6-digit code'],
-  '/allowlist': ['Allow-list', 'Placeholder', 'cannot be removed'],
-  '/schedules': ['Schedules', 'Placeholder'],
-  '/insights': ['Insights', 'Placeholder', 'No browsing history'],
-  '/settings': ['Settings', 'Placeholder', 'Auto-exit on disconnect'],
-  '/admin': ['Admin', 'Placeholder'],
+  '/focus': ['No active focus session', 'Go to dashboard'],
+  '/devices': ['Devices', 'Paired agents', '6-digit code'],
+  '/allowlist': ['Allow-list', 'Protected applications', 'Locked'],
+  '/schedules': ['Schedules', 'Recurring windows'],
+  '/insights': ['Insights', 'Daily focus time', 'No completed sessions'],
+  '/settings': ['Settings', 'Change password', 'Danger zone'],
+  '/admin': ['Administration', 'Users', 'Published presets'],
   '/nope-not-a-route': ['404', 'does not exist', 'dashboard'],
 }
 
